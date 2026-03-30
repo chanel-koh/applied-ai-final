@@ -8,9 +8,6 @@ Three core actions a user should be able to perform are adding a pet, view today
 
 Classes that will help accomplish these actions are Owner, Pet, Task, and Scheduler. Owner attributes will be name and pet list. Owner will have responsibilities like adding a pet. Pet attribues will be name, breed, age, activity level, and medications. Pet will have responsibilities like keeping track of what medications the pet needs and at what intervals, a feeding schedule, and a walking schedule. Task attributes will be pet, name, time, location, and priority. Task will have responsibilities like update time and update location. Scheduler will have a tasks attribute. Scheduler will have responsibilities like adding a task, displaying daily tasks and filtering by priority.
 
-UML Diagram:
-![alt text](PawPalUML.png)
-
 **b. Design changes**
 
 Yes, my design changed during implementation to include missing relationships. One specific change I made based on Copilot feedback was to add a scheduler attribute to Owner so that they can create tasks for their pets. Another change I made was to add a tasks: List[Task] attribute to Pet for easy display of tasks for a certain Pet.

@@ -1,6 +1,6 @@
 import streamlit as st
 from pawpal_system import Owner, Pet, Task, Scheduler
-from datetime import datetime
+from datetime import datetime, date, time
 
 st.set_page_config(page_title="PawPal+", page_icon="🐾", layout="centered")
 
@@ -74,7 +74,6 @@ if "owner" in st.session_state:
         st.info("No pets added yet.")
 
 st.markdown("### Tasks")
-st.caption("Add a few tasks. In your final version, these should feed into your scheduler.")
 
 if "owner" in st.session_state and st.session_state.owner.pets:
     pet_names = [p.name for p in st.session_state.owner.pets]
@@ -88,12 +87,22 @@ with col2:
 with col3:
     priority = st.selectbox("Priority", ["low", "medium", "high"], index=2)
 
+col4, col5, col6 = st.columns(3)
+with col4:
+    task_date = st.date_input("Date", value=date.today())
+with col5:
+    task_time = st.time_input("Time", value=time(8, 0))
+with col6:
+    frequency = st.selectbox("Frequency", ["once", "daily", "weekly"], index=0)
+
 if st.button("Add task"):
     if "owner" in st.session_state and st.session_state.owner.pets:
         selected_pet = next(p for p in st.session_state.owner.pets if p.name == selected_pet_name)
-        task = Task(pet=selected_pet, description=task_title, time=datetime.now(), frequency="daily")  # Using defaults for time and frequency
+        task_datetime = datetime.combine(task_date, task_time)
+        task = Task(pet=selected_pet, description=task_title, time=task_datetime, frequency=frequency)
         selected_pet.tasks.append(task)
-        st.success(f"Task added to {selected_pet_name}!")
+        st.session_state.owner.scheduler.add_task(task)
+        st.success(f"Task added for {selected_pet_name} on {task_date.strftime('%b %d')} at {task_time.strftime('%H:%M')}!")
     else:
         st.error("Create owner and add a pet first.")
 
@@ -111,16 +120,45 @@ else:
 st.divider()
 
 st.subheader("Build Schedule")
-st.caption("This button should call your scheduling logic once you implement it.")
 
 if st.button("Generate schedule"):
     if "owner" in st.session_state:
-        tasks = st.session_state.owner.get_all_pet_tasks()
-        if tasks:
-            st.write("Scheduled tasks for today:")
-            for task in tasks:
-                st.write(f"- {task.description} for {task.pet.name} at {task.time.strftime('%H:%M')} (Frequency: {task.frequency})")
+        owner = st.session_state.owner
+        scheduler = owner.scheduler
+
+        today = date.today()
+        todays_tasks = scheduler.get_daily_tasks(today)
+
+        if not todays_tasks:
+            st.info("No tasks scheduled for today. Add a task with today's date to see it here.")
         else:
-            st.info("No tasks to schedule. Add some tasks first.")
+            sorted_tasks = scheduler.sort_tasks_by_time(todays_tasks)
+            conflict_warnings = scheduler.detect_time_conflicts()
+
+            if conflict_warnings:
+                for warning in conflict_warnings:
+                    st.warning(warning)
+            else:
+                st.success("No conflicts detected in your current schedule.")
+
+            st.caption(f"Showing {len(sorted_tasks)} task(s) for today ({today.strftime('%B %d, %Y')})")
+            task_rows = []
+            for task in sorted_tasks:
+                task_rows.append({
+                    "Time": task.time.strftime("%Y-%m-%d %H:%M"),
+                    "Pet": task.pet.name,
+                    "Task": task.description,
+                    "Frequency": task.frequency,
+                    "Completed": "✅" if task.completed else "❌"
+                })
+
+            st.subheader("Sorted Schedule")
+            st.table(task_rows)
+
+            next_task = scheduler.get_next_task()
+            if next_task:
+                st.success(f"Next task: {next_task.description} for {next_task.pet.name} at {next_task.time.strftime('%H:%M')}")
+            else:
+                st.info("No upcoming tasks available.")
     else:
         st.error("Create owner and pet first.")
