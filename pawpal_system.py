@@ -47,19 +47,19 @@ class Pet:
 @dataclass
 class Task:
     pet: Pet
-    title: str
+    description: str
     time: datetime
-    location: str
-    priority: int
+    frequency: str
+    completed: bool = False
 
     def update_time(self, new_time: datetime) -> None:
         self.time = new_time
 
-    def update_location(self, new_location: str) -> None:
-        self.location = new_location
+    def update_frequency(self, new_frequency: str) -> None:
+        self.frequency = new_frequency
 
-    def set_priority(self, new_priority: int) -> None:
-        self.priority = new_priority
+    def mark_completed(self) -> None:
+        self.completed = True
 
 class Owner:
     def __init__(self, name: str):
@@ -97,8 +97,8 @@ class Scheduler:
     def get_daily_tasks(self, target_date: date) -> List[Task]:
         return [t for t in self.tasks if t.time.date() == target_date]
 
-    def filter_tasks_by_priority(self, priority: int) -> List[Task]:
-        return [t for t in self.tasks if t.priority == priority]
+    def filter_tasks_by_completion(self, completed: bool) -> List[Task]:
+        return [t for t in self.tasks if t.completed == completed]
 
     def get_next_task(self) -> Optional[Task]:
         if self.tasks:
