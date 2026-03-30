@@ -22,55 +22,6 @@ def test_add_task_to_pet_increases_task_count():
     assert len(pet.tasks) == 1
 
 
-def test_sort_tasks_by_time_correctness():
-    from datetime import datetime
-
-    pet = Pet(name="Rover", breed="Beagle", age=3, activity_level="medium")
-    scheduler = __import__("pawpal_system").Scheduler()
-
-    t1 = Task(pet=pet, description="Morning walk", time=datetime(2026, 3, 29, 9, 0), frequency="once")
-    t2 = Task(pet=pet, description="Evening play", time=datetime(2026, 3, 29, 18, 0), frequency="once")
-    t3 = Task(pet=pet, description="Noon check", time=datetime(2026, 3, 29, 12, 0), frequency="once")
-
-    scheduler.add_task(t1)
-    scheduler.add_task(t2)
-    scheduler.add_task(t3)
-
-    sorted_tasks = scheduler.sort_tasks_by_time()
-    assert [task.description for task in sorted_tasks] == ["Morning walk", "Noon check", "Evening play"]
-
-
-def test_request_daily_recurrence_completion_creates_next_day():
-    pet = Pet(name="Spot", breed="Dalmatian", age=5, activity_level="high")
-    scheduler = __import__("pawpal_system").Scheduler()
-
-    initial_time = datetime(2026, 3, 29, 8, 0)
-    recurring_task = scheduler.create_recurring_task(pet, "Feed", initial_time, "daily", timedelta(days=1))
-
-    scheduler.complete_task_and_schedule_next(recurring_task)
-
-    next_task = scheduler.get_next_task()
-    assert next_task is not None
-    assert next_task.description == "Feed"
-    assert next_task.time.date() == (initial_time + timedelta(days=1)).date()
-
-
-def test_conflict_detection_duplicate_times():
-    pet1 = Pet(name="Buddy", breed="Lab", age=4, activity_level="high")
-    pet2 = Pet(name="Mittens", breed="Siamese", age=2, activity_level="low")
-    scheduler = __import__("pawpal_system").Scheduler()
-
-    time_slot = datetime(2026, 3, 29, 10, 0)
-    scheduler.add_task(Task(pet=pet1, description="Walk", time=time_slot, frequency="once"))
-    scheduler.add_task(Task(pet=pet2, description="Feed", time=time_slot, frequency="once"))
-
-    conflicts = scheduler.detect_time_conflicts()
-    assert len(conflicts) == 1
-    assert "Time conflict" in conflicts[0]
-    assert "Walk" in conflicts[0] and "Feed" in conflicts[0]
-
-
-
 # ==================== SORTING CORRECTNESS TESTS ====================
 
 def test_sort_tasks_by_time_ascending_order():
