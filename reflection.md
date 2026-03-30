@@ -1,6 +1,7 @@
 # PawPal+ Project Reflection
 
 ## 1. System Design
+As stated in the README, PawPal is a stremalit app that helps a pet owner plan care tasks for their pet. PawPal must have functionality to track pet care tasks, consider contraints, and produce and explain a daily plan for the owner. 
 
 **a. Initial design**
 Three core actions a user should be able to perform are adding a pet, view today's tasks, and schedule a task. 
@@ -12,8 +13,7 @@ UML Diagram:
 
 **b. Design changes**
 
-- Did your design change during implementation?
-- If yes, describe at least one change and why you made it.
+Yes, my design changed during implementation to include missing relationships. One specific change I made based on Copilot feedback was to add a scheduler attribute to Owner so that they can create tasks for their pets. Another change I made was to add a tasks: List[Task] attribute to Pet for easy display of tasks for a certain Pet.
 
 ---
 
