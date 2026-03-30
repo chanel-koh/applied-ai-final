@@ -24,10 +24,17 @@ Yes, my design changed during implementation to include missing relationships. O
 - What constraints does your scheduler consider (for example: time, priority, preferences)?
 - How did you decide which constraints mattered most?
 
+One constraint my scheduler considers is time- tasks are sorted by their scheduled time. Time conflicts are also detected and the system gives a warning to the user. I decided that time constraint mattered most because, as an app that is based on scheduling, most likely every user cares about time to care for their pet properly.
+
 **b. Tradeoffs**
 
 - Describe one tradeoff your scheduler makes.
 - Why is that tradeoff reasonable for this scenario?
+
+One tradeoff my scheduler makes is to only check for exact time matches instead of overlapping durations. This tradeoff is reasonable for this scenario because some tasks have variable time frames. For example, even if you have an appointment scheduled for the vet, there may be additional waiting time or extra information to talk about afterwards. Plus, the full daily schedule is shown to the owner anyway, so they can glance at it and decide, with their trained judgement, if any time periods overlap.
+
+**c. Smarter Scheduling**
+There are currently four major algorithmic features: sorting by time, multi-criteria filtering, automatic task rescheduling on completion, and conflict detection. Sorting by time displays tasks in chronological order in a HH:MM format, regardless of insertion order. Multi-criteria filtering allows a user to sort by completed tasks and by pet. Automatic task rescheduling on completion checks if the task is marked complete and if frequency is "daily" or "weekly", calculates the next occurrence of a task, then creates a new task instance for the next cycle and adds it to a scheduler. Lastly, conflict detection identifies tasks with the same HH:MM and generates a warning message about the conflict.
 
 ---
 

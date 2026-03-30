@@ -40,28 +40,45 @@ At minimum, your system should:
 
 st.divider()
 
-st.subheader("Quick Demo Inputs (UI only)")
+st.subheader("Create Owner")
 owner_name = st.text_input("Owner name", value="Jordan")
-pet_name = st.text_input("Pet name", value="Mochi")
-species = st.selectbox("Species", ["dog", "cat", "other"])
 
-st.subheader("Create Owner and Pet")
-if st.button("Create Owner and Pet"):
+if st.button("Create Owner"):
     if "owner" not in st.session_state:
         st.session_state.owner = Owner(owner_name)
-        pet = Pet(pet_name, breed=species, age=1, activity_level="medium")  # Assuming default age and activity
-        st.session_state.owner.add_pet(pet)
-        st.success("Owner and pet created and stored in session state!")
+        st.success("Owner created and stored in session state!")
     else:
         st.info("Owner already exists in session state.")
+
+st.subheader("Add Pet")
+pet_name = st.text_input("Pet name", value="Mochi")
+species = st.selectbox("Species", ["dog", "cat", "other"])
+age = st.number_input("Age", min_value=0, max_value=30, value=1)
+activity_level = st.selectbox("Activity Level", ["low", "medium", "high"], index=1)
+
+if st.button("Add Pet"):
+    if "owner" in st.session_state:
+        pet = Pet(name=pet_name, breed=species, age=age, activity_level=activity_level)
+        st.session_state.owner.add_pet(pet)
+        st.success(f"Pet {pet_name} added to owner!")
+    else:
+        st.error("Create owner first.")
 
 if "owner" in st.session_state:
     st.write(f"Stored Owner: {st.session_state.owner.name}")
     if st.session_state.owner.pets:
-        st.write(f"Stored Pet: {st.session_state.owner.pets[0].name}")
+        st.write("Pets:")
+        for pet in st.session_state.owner.pets:
+            st.write(f"- {pet.name} ({pet.breed}, age {pet.age}, activity {pet.activity_level})")
+    else:
+        st.info("No pets added yet.")
 
 st.markdown("### Tasks")
 st.caption("Add a few tasks. In your final version, these should feed into your scheduler.")
+
+if "owner" in st.session_state and st.session_state.owner.pets:
+    pet_names = [p.name for p in st.session_state.owner.pets]
+    selected_pet_name = st.selectbox("Select pet for task", pet_names)
 
 col1, col2, col3 = st.columns(3)
 with col1:
@@ -73,21 +90,23 @@ with col3:
 
 if st.button("Add task"):
     if "owner" in st.session_state and st.session_state.owner.pets:
-        pet = st.session_state.owner.pets[0]
-        task = Task(pet=pet, description=task_title, time=datetime.now(), frequency="daily")  # Using defaults for time and frequency
-        pet.tasks.append(task)
-        st.success("Task added to pet!")
+        selected_pet = next(p for p in st.session_state.owner.pets if p.name == selected_pet_name)
+        task = Task(pet=selected_pet, description=task_title, time=datetime.now(), frequency="daily")  # Using defaults for time and frequency
+        selected_pet.tasks.append(task)
+        st.success(f"Task added to {selected_pet_name}!")
     else:
-        st.error("Create owner and pet first.")
+        st.error("Create owner and add a pet first.")
 
 if "owner" in st.session_state and st.session_state.owner.pets:
-    pet = st.session_state.owner.pets[0]
-    if pet.tasks:
-        st.write("Current tasks:")
-        task_data = [{"description": t.description, "time": t.time.strftime("%Y-%m-%d %H:%M"), "frequency": t.frequency, "completed": t.completed} for t in pet.tasks]
-        st.table(task_data)
-    else:
-        st.info("No tasks yet. Add one above.")
+    for pet in st.session_state.owner.pets:
+        if pet.tasks:
+            st.write(f"Tasks for {pet.name}:")
+            task_data = [{"description": t.description, "time": t.time.strftime("%Y-%m-%d %H:%M"), "frequency": t.frequency, "completed": t.completed} for t in pet.tasks]
+            st.table(task_data)
+        else:
+            st.info(f"No tasks for {pet.name} yet.")
+else:
+    st.info("No pets yet. Add one above.")
 
 st.divider()
 
@@ -100,7 +119,7 @@ if st.button("Generate schedule"):
         if tasks:
             st.write("Scheduled tasks for today:")
             for task in tasks:
-                st.write(f"- {task.description} at {task.time.strftime('%H:%M')} (Frequency: {task.frequency})")
+                st.write(f"- {task.description} for {task.pet.name} at {task.time.strftime('%H:%M')} (Frequency: {task.frequency})")
         else:
             st.info("No tasks to schedule. Add some tasks first.")
     else:
