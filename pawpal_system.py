@@ -77,17 +77,21 @@ class Task:
         self.completed = True
 
     def get_next_occurrences(self, start_date: datetime, count: int = 5) -> List[datetime]:
-        """Generate next N occurrence dates for recurring tasks."""
+        """Generate the next N occurrence datetimes for recurring tasks from start_date inclusive."""
         if not self.is_recurring or not self.recurrence_interval:
             return [self.time] if self.time >= start_date else []
-        
+
         occurrences = []
         current = self.time
-        while len(occurrences) < count and current >= start_date:
-            if current >= start_date:
-                occurrences.append(current)
+
+        # Advance to the first occurrence on or after start_date.
+        while current < start_date:
             current += self.recurrence_interval
-        
+
+        while len(occurrences) < count:
+            occurrences.append(current)
+            current += self.recurrence_interval
+
         return occurrences
 
 class Owner:
@@ -121,13 +125,17 @@ class Scheduler:
         self.tasks: List[Task] = []
 
     def add_task(self, task: Task) -> None:
-        """Add a task to the scheduler."""
+        """Add a task to the scheduler and keep the pet task list in sync."""
         self.tasks.append(task)
+        if task not in task.pet.tasks:
+            task.pet.tasks.append(task)
 
     def remove_task(self, task: Task) -> None:
-        """Remove a task from the scheduler if it exists."""
+        """Remove a task from the scheduler and from the pet if it exists."""
         if task in self.tasks:
             self.tasks.remove(task)
+        if task in task.pet.tasks:
+            task.pet.tasks.remove(task)
 
     def get_daily_tasks(self, target_date: date) -> List[Task]:
         """Return tasks scheduled for a specific date."""
@@ -144,9 +152,9 @@ class Scheduler:
         return None
 
     def sort_tasks_by_time(self, tasks: List[Task] = None, reverse: bool = False) -> List[Task]:
-        """Sort tasks by time in HH:MM format. If no tasks provided, sort all scheduler tasks."""
+        """Sort tasks by full datetime. If no tasks provided, sort all scheduler tasks."""
         task_list = tasks or self.tasks
-        return sorted(task_list, key=lambda t: t.time.strftime("%H:%M"), reverse=reverse)
+        return sorted(task_list, key=lambda t: t.time, reverse=reverse)
 
     def filter_tasks_by_completion_and_pet(self, completed: bool, pet_name: str) -> List[Task]:
         """Filter tasks by both completion status and pet name."""
@@ -188,7 +196,7 @@ class Scheduler:
 
     def create_recurring_task(self, pet: Pet, description: str, time: datetime, 
                             frequency: str, interval: timedelta) -> Task:
-        """Create and add a recurring task to the scheduler."""
+        """Create and add a recurring task to the scheduler and the pet."""
         task = Task(
             pet=pet,
             description=description,
@@ -201,33 +209,31 @@ class Scheduler:
         return task
 
     def complete_task_and_schedule_next(self, task: Task) -> None:
-        """Mark a task as completed and automatically schedule the next occurrence for recurring tasks."""
+        """Mark a task as completed and schedule the next occurrence when possible."""
         task.mark_completed()
-        
-        # Check if this is a recurring task that needs a follow-up
-        if task.frequency.lower() in ["daily", "weekly"]:
-            # Calculate next occurrence
-            if task.frequency.lower() == "daily":
-                next_time = task.time + timedelta(days=1)
-            elif task.frequency.lower() == "weekly":
-                next_time = task.time + timedelta(days=7)
-            else:
-                return  # Should not reach here
-            
-            # Create new task instance for next occurrence
-            next_task = Task(
-                pet=task.pet,
-                description=task.description,
-                time=next_time,
-                frequency=task.frequency,
-                completed=False,
-                is_recurring=False,  # Individual instances aren't recurring themselves
-                recurrence_interval=None
-            )
-            
-            # Add the new task to both the pet and scheduler
-            task.pet.tasks.append(next_task)
-            self.add_task(next_task)
+
+        next_time = None
+        if task.recurrence_interval:
+            next_time = task.time + task.recurrence_interval
+        elif task.frequency.lower() == "daily":
+            next_time = task.time + timedelta(days=1)
+        elif task.frequency.lower() == "weekly":
+            next_time = task.time + timedelta(days=7)
+
+        if not next_time:
+            return
+
+        next_task = Task(
+            pet=task.pet,
+            description=task.description,
+            time=next_time,
+            frequency=task.frequency,
+            completed=False,
+            is_recurring=False,
+            recurrence_interval=None
+        )
+
+        self.add_task(next_task)
 
     def get_all_tasks_from_owner_pets(self, owner: Owner) -> List[Task]:
         """Retrieve tasks from an Owner through owner task aggregation."""
