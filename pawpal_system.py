@@ -60,6 +60,8 @@ class Task:
     description: str
     time: datetime
     frequency: str
+    duration: int = 0
+    priority: str = "medium"
     completed: bool = False
     is_recurring: bool = False
     recurrence_interval: Optional[timedelta] = None
@@ -129,6 +131,7 @@ class Scheduler:
         self.tasks.append(task)
         if task not in task.pet.tasks:
             task.pet.tasks.append(task)
+        self.tasks.sort(key=lambda t: t.time)
 
     def remove_task(self, task: Task) -> None:
         """Remove a task from the scheduler and from the pet if it exists."""
@@ -163,31 +166,35 @@ class Scheduler:
     def expand_recurring_tasks(self, start_date: date, end_date: date) -> List[Task]:
         """Generate concrete task instances from recurring tasks within date range."""
         expanded_tasks = []
-        
+        range_start = datetime.combine(start_date, datetime.min.time())
+        range_end = datetime.combine(end_date, datetime.max.time())
+
         for task in self.tasks:
             if task.is_recurring and task.recurrence_interval:
-                occurrences = task.get_next_occurrences(
-                    datetime.combine(start_date, datetime.min.time()),
-                    count=30  # reasonable limit to prevent infinite loops
-                )
-                
-                for occurrence in occurrences:
-                    if start_date <= occurrence.date() <= end_date:
-                        # Create a new task instance for this occurrence
-                        new_task = Task(
+                current = task.time
+
+                # Advance to the first occurrence on or after range_start.
+                while current < range_start:
+                    current += task.recurrence_interval
+
+                while current <= range_end:
+                    if start_date <= current.date() <= end_date:
+                        expanded_tasks.append(Task(
                             pet=task.pet,
                             description=task.description,
-                            time=occurrence,
+                            time=current,
                             frequency=task.frequency,
-                            is_recurring=False,  # concrete instances are not recurring
+                            duration=task.duration,
+                            priority=task.priority,
+                            is_recurring=False,
                             recurrence_interval=None
-                        )
-                        expanded_tasks.append(new_task)
+                        ))
+                    current += task.recurrence_interval
             else:
                 # Non-recurring task
                 if start_date <= task.time.date() <= end_date:
                     expanded_tasks.append(task)
-        
+
         return expanded_tasks
 
     def get_tasks_for_date_range(self, start_date: date, end_date: date) -> List[Task]:
@@ -212,13 +219,18 @@ class Scheduler:
         """Mark a task as completed and schedule the next occurrence when possible."""
         task.mark_completed()
 
+        recurrence_map = {
+            "daily": timedelta(days=1),
+            "weekly": timedelta(days=7)
+        }
+
         next_time = None
         if task.recurrence_interval:
             next_time = task.time + task.recurrence_interval
-        elif task.frequency.lower() == "daily":
-            next_time = task.time + timedelta(days=1)
-        elif task.frequency.lower() == "weekly":
-            next_time = task.time + timedelta(days=7)
+        else:
+            next_time = recurrence_map.get(task.frequency.lower())
+            if next_time is not None:
+                next_time = task.time + next_time
 
         if not next_time:
             return
@@ -228,6 +240,8 @@ class Scheduler:
             description=task.description,
             time=next_time,
             frequency=task.frequency,
+            duration=task.duration,
+            priority=task.priority,
             completed=False,
             is_recurring=False,
             recurrence_interval=None
@@ -239,19 +253,18 @@ class Scheduler:
         """Retrieve tasks from an Owner through owner task aggregation."""
         return owner.get_all_pet_tasks()
 
-    def detect_time_conflicts(self) -> List[str]:
+    def detect_time_conflicts(self, tasks: List[Task] = None) -> List[str]:
         """Detect tasks scheduled at the same time and return warning messages.
-        
-        Returns a list of warning strings for any time conflicts found.
-        Uses defaultdict for cleaner grouping and list comprehension for concise warnings.
+
+        If an explicit task list is provided, check conflicts only within that list.
         """
+        tasks_to_check = tasks if tasks is not None else self.tasks
         time_groups = defaultdict(list)
-        
+
         # Group tasks by their exact time
-        for task in self.tasks:
+        for task in tasks_to_check:
             time_groups[task.time].append(task)
-        
-        # Generate warnings for conflicts using list comprehension
+
         return [
             f"Time conflict at {time_key.strftime('%Y-%m-%d %H:%M')}: "
             f"{', '.join(f'{task.pet.name} ({task.description})' for task in tasks_at_time)}"

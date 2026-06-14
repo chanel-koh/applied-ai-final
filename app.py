@@ -99,8 +99,14 @@ if st.button("Add task"):
     if "owner" in st.session_state and st.session_state.owner.pets:
         selected_pet = next(p for p in st.session_state.owner.pets if p.name == selected_pet_name)
         task_datetime = datetime.combine(task_date, task_time)
-        task = Task(pet=selected_pet, description=task_title, time=task_datetime, frequency=frequency)
-        selected_pet.tasks.append(task)
+        task = Task(
+            pet=selected_pet,
+            description=task_title,
+            time=task_datetime,
+            frequency=frequency,
+            duration=duration,
+            priority=priority
+        )
         st.session_state.owner.scheduler.add_task(task)
         st.success(f"Task added for {selected_pet_name} on {task_date.strftime('%b %d')} at {task_time.strftime('%H:%M')}!")
     else:
@@ -133,7 +139,7 @@ if st.button("Generate schedule"):
             st.info("No tasks scheduled for today. Add a task with today's date to see it here.")
         else:
             sorted_tasks = scheduler.sort_tasks_by_time(todays_tasks)
-            conflict_warnings = scheduler.detect_time_conflicts()
+            conflict_warnings = scheduler.detect_time_conflicts(todays_tasks)
 
             if conflict_warnings:
                 for warning in conflict_warnings:
