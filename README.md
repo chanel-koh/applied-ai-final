@@ -65,9 +65,13 @@ Test coverage includes verification on the following:
 
 Confidence Level in system reliability based on test results: 5/5
 
-## Demo
-![alt text](<Add task.png>)
-
-![alt text](<Tasks for each pet.png>)
-
-![alt text](<Working scheduling.png>)
+## Sample Output
+```
+Tasks sorted by time (using sort_tasks_by_time):
+  ✓ 08:00: Morning Walk for Buddy
+  ○ 09:00: Medication for Buddy
+  ✓ 10:30: Vet Appointment for Buddy
+  ○ 12:00: Feeding for Whiskers
+  ○ 14:00: Play Time for Whiskers
+  ○ 18:00: Evening Walk for Buddy
+```
