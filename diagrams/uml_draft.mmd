@@ -1,0 +1,71 @@
+```mermaid
+classDiagram
+
+	class Owner {
+		-String name
+		-List~Pet~ pets
+		-Scheduler scheduler
+		+add_pet(pet: Pet) : void
+		+remove_pet(pet: Pet) : void
+		+list_pets() : List~Pet~
+		+get_all_pet_tasks() : List~Task~
+	}
+
+	class Scheduler {
+		-List~Task~ tasks
+		+add_task(task: Task) : void
+		+remove_task(task: Task) : void
+		+get_daily_tasks(target_date: date) : List~Task~
+		+filter_tasks_by_completion(completed: Boolean) : List~Task~
+		+get_next_task() : Optional~Task~
+		+sort_tasks_by_time(tasks: List~Task~, reverse: Boolean) : List~Task~
+		+filter_tasks_by_completion_and_pet(completed: Boolean, pet_name: String) : List~Task~
+		+expand_recurring_tasks(start_date: date, end_date: date) : List~Task~
+		+get_tasks_for_date_range(start_date: date, end_date: date) : List~Task~
+		+create_recurring_task(pet: Pet, description: String, time: datetime, frequency: String, interval: TimeDelta) : Task
+		+complete_task_and_schedule_next(task: Task) : void
+		+get_all_tasks_from_owner_pets(owner: Owner) : List~Task~
+		+detect_time_conflicts() : List~String~
+	}
+
+	class Task {
+		-Pet pet
+		-String description
+		-datetime time
+		-String frequency
+		-Boolean completed
+		-Boolean is_recurring
+		-Optional~TimeDelta~ recurrence_interval
+		+update_time(new_time: datetime) : void
+		+update_frequency(new_frequency: String) : void
+		+mark_completed() : void
+		+get_next_occurrences(start_date: datetime, count: int) : List~datetime~
+	}
+
+	class Pet {
+		-String name
+		-String breed
+		-int age
+		-String activity_level
+		-List~String~ medications
+		-List~String~ feeding_schedule
+		-List~String~ walking_schedule
+		-List~Task~ tasks
+		+add_medication(med: String) : void
+		+remove_medication(med: String) : void
+		+add_feeding(feeding: String) : void
+		+remove_feeding(feeding: String) : void
+		+add_walking(walking: String) : void
+		+remove_walking(walking: String) : void
+		+get_medication_schedule() : List~String~
+		+get_feeding_schedule() : List~String~
+		+get_walking_schedule() : List~String~
+	}
+
+	Owner "1" o-- "1" Scheduler : owns/composes
+	Scheduler "1" o-- "0..*" Task : manages
+	Task "0..1" -- "1" Pet : references
+	Pet "1" o-- "0..*" Task : has
+	Owner "1" --> "0..*" Pet : has
+
+```
