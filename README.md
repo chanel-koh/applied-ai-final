@@ -32,9 +32,6 @@ source .venv/bin/activate  # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
 ```
 
-### Smarter Scheduling
-There are currently four major algorithmic features: sorting by time, multi-criteria filtering, automatic task rescheduling on completion, and conflict detection. Sorting by time displays tasks in chronological order in a HH:MM format, regardless of insertion order. Multi-criteria filtering allows a user to sort by completed tasks and by pet. Automatic task rescheduling on completion checks if the task is marked complete and if frequency is "daily" or "weekly", calculates the next occurrence of a task, then creates a new task instance for the next cycle and adds it to a scheduler. Lastly, conflict detection identifies tasks with the same HH:MM and generates a warning message about the conflict.
-
 ## Smarter Scheduling Features
 
 ### Chronological Schedule Sorting (`sort_tasks_by_time()`)
@@ -109,3 +106,117 @@ Tasks sorted by time (using sort_tasks_by_time):
   ○ 14:00: Play Time for Whiskers
   ○ 18:00: Evening Walk for Buddy
 ```
+
+## Demo Walkthrough
+
+### Main UI Features and User Actions
+
+PawPal+ provides an intuitive interface for managing pet care schedules:
+
+**Owner & Pet Management:**
+- Create an owner profile with a name
+- Add multiple pets with details (name, breed, age, activity level)
+- View all registered pets and their information
+
+**Task Scheduling:**
+- Add pet care tasks with:
+  - Task title (e.g., "Morning Walk", "Feeding", "Medication")
+  - Duration (in minutes)
+  - Priority level (low, medium, high)
+  - Specific date and time (HH:MM format)
+  - Frequency (once, daily, weekly)
+- Tasks are automatically assigned to a specific pet
+- View and filter tasks by completion status and pet
+
+**Schedule Viewing:**
+- Display today's complete schedule in chronological order
+- View all upcoming tasks with time conflicts highlighted
+- Automatically reschedule recurring tasks when marked complete
+
+### Example Workflow
+
+Here's a typical user journey in PawPal+:
+
+1. **Create Owner:** User "Alice" starts the app and creates her profile
+2. **Add Pets:** Alice adds two pets:
+   - Buddy (Golden Retriever, 3 years old, high activity level)
+   - Whiskers (Cat, 2 years old, low activity level)
+3. **Schedule Tasks:** Alice adds daily care tasks:
+   - 08:00 - Morning Walk (Buddy)
+   - 12:00 - Feeding (Whiskers)
+   - 14:00 - Play Time (Whiskers)
+   - 18:00 - Evening Walk (Buddy)
+4. **View Schedule:** The scheduler automatically sorts all tasks chronologically
+5. **Mark Complete:** Alice marks the morning walk complete → scheduler automatically creates tomorrow's morning walk task
+6. **Check Conflicts:** When Alice tries to add a vet appointment and grooming session at the same time, the system warns her of the time conflict
+
+### Key Scheduler Behaviors
+
+**Chronological Sorting:** All tasks are automatically sorted by time (HH:MM format) regardless of insertion order, making it easy to see the day's timeline at a glance.
+
+**Conflict Detection:** The scheduler automatically identifies when multiple tasks are scheduled at the exact same time and displays warning messages to help users avoid double-booking.
+
+**Automatic Rescheduling:** When a user marks a daily or weekly task as complete, the system:
+- Marks the original task as done (✓ indicator)
+- Calculates the next occurrence (+1 day for daily, +7 days for weekly)
+- Automatically creates a new task instance for the next cycle
+
+**Multi-Criteria Filtering:** Tasks can be filtered by:
+- Completion status alone (show all pending or completed tasks)
+- Combined filters (show only incomplete tasks for a specific pet)
+
+**Recurring Task Expansion:** Tasks flagged as recurring are expanded into concrete instances across any date range, allowing users to preview multiple days of care needs at once.
+
+### Sample CLI Output
+
+Running `main.py` demonstrates the core scheduling features:
+
+```
+=== DEMONSTRATING SORTING AND FILTERING METHODS ===
+
+1. Tasks sorted by time (using sort_tasks_by_time):
+  ✓ 08:00: Morning Walk for Buddy
+  ○ 09:00: Medication for Buddy
+  ✓ 10:30: Vet Appointment for Buddy
+  ○ 12:00: Feeding for Whiskers
+  ○ 14:00: Play Time for Whiskers
+  ○ 18:00: Evening Walk for Buddy
+
+2. Filtering by completion status and pet:
+   Completed tasks for Buddy:
+     ✓ 08:00: Morning Walk
+     ✓ 10:30: Vet Appointment
+   Incomplete tasks for Whiskers:
+     ○ 12:00: Feeding
+     ○ 14:00: Play Time
+
+3. Recurring task expansion for next 3 days:
+     2026-06-13 09:00: Medication
+     2026-06-14 09:00: Medication
+     2026-06-15 09:00: Medication
+
+4. Today's schedule (original method):
+  ✓ 08:00: Morning Walk for Buddy
+  ○ 09:00: Medication for Buddy
+  ✓ 10:30: Vet Appointment for Buddy
+  ○ 12:00: Feeding for Whiskers
+  ○ 14:00: Play Time for Whiskers
+  ○ 18:00: Evening Walk for Buddy
+
+5. Demonstrating automatic task completion and rescheduling:
+   Before completing the evening walk:
+     ○ 18:00: Evening Walk (completed: False)
+   Completing the evening walk and scheduling next occurrence...
+   After completion:
+     ✓ 18:00: Evening Walk (completed: True)
+     New tasks in scheduler:
+       ✓ 2026-06-13 18:00: Evening Walk (completed: True)
+       ○ 2026-06-14 18:00: Evening Walk (completed: False)
+
+6. Demonstrating conflict detection:
+   Adding two tasks at the same time (11:00 AM)...
+   Checking for time conflicts...
+Conflicts detected:
+     Time conflict at 2026-06-13 11:00: Buddy (Grooming Session), Whiskers (Vet Check)
+```
+
