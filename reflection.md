@@ -37,18 +37,26 @@ One tradeoff my scheduler makes is to only check for exact time matches instead 
 **a. How you used AI**
 
 - How did you use AI tools during this project (for example: design brainstorming, debugging, refactoring)?
-- What kinds of prompts or questions were most helpful?
 
- I used AI tools during this project to brainstorm missing dependencies or logical holes in design brainstorming, aiding a "CLI-first" workflow by writing test functionality in main.py before connecting the UI, and writing pytest cases. AI was a collaborative partner, offering ideas that I should consider in my deisgn and implementation and writing tests for code to pass. 
+I used AI tools during this project to brainstorm missing dependencies or logical holes in design brainstorming, aiding a "CLI-first" workflow by writing test functionality in main.py before connecting the UI, and writing pytest cases. AI was a collaborative partner, offering ideas that I should consider in my deisgn and implementation and writing tests for code to pass.
+
+- What kinds of prompts or questions were most helpful?
 
 The kinds of prompts that were the most helpful were ones that were specific in terms of file and intended outcome. For example, when asking AI to write test cases, I specified the file and what cases/functionality I wanted it to check. This made the tests AI wrote more focused.
 
+- Which AI coding assistant features were most effective for building your scheduler?
+ 
+The most effective features where using the different modes, like using Plan mode to flesh out ideas for system design before implementing them with Agent mode.
+
+- How did using separate chat sessions for different phases help you stay organized?
+Using separate chat sessions for different phases helped me stay organized by making sure copilot only focused on the one task I asked for that session. For example, I started a new session when I worked on tests vs the main app because they were two separate parts of the system, and the AI output remained very relevant to the task.
+
 **b. Judgment and verification**
 
-- Describe one moment where you did not accept an AI suggestion as-is.
+- Give one example of an AI suggestion you rejected or modified to keep your system design clean.
 - How did you evaluate or verify what the AI suggested?
 
-A moment where I did not accept an AI suggestion as-is is when, for adding tasks, AI suggested that the 'time' aspect should get automatically instantiated to the time the user added the task, instead of the intended functionality of the time the user should do that task by. I evaulated what the AI suggested mainly by running the streamlit app and testing out the functionality manually. In the end, I eneded up asking AI to modify to take in a user-defined time for the task instead of its first suggestion.
+A moment where I rejected an AI suggestion as-is is when, for adding tasks, AI suggested that the 'time' aspect should get automatically instantiated to the time the user added the task, instead of the intended functionality of the time the user should do that task by. I evaulated what the AI suggested mainly by running the streamlit app and testing out the functionality manually. In the end, I eneded up asking AI to modify to take in a user-defined time for the task instead of its first suggestion.
 
 ---
 
@@ -88,4 +96,9 @@ If I had another iteration, I would improve the system with additional ways to f
 
 - What is one important thing you learned about designing systems or working with AI on this project?
 
-One important thing I learned about working with AI to design a system is that the more specific you are with what to do and what you'd like the outcome to be, the better your solutions usually turn out.
+One important thing I learned about working with AI to design a system is that the more specific you are with what to do and what you'd like the outcome to be, the better your solutions usually turn out. 
+
+**d. Being the lead architect**
+- Summarize what you learned about being the "lead architect" when collaborating with powerful AI tools.
+
+I learned to design the system in small chunks at a time to verify it's what you intented before moving on to another part. If you ask to do many tasks at once, it's easy to just accept the output because reviewing becomes tiring mentally, blurring your judgement.
