@@ -63,6 +63,40 @@ Test coverage includes verification on the following:
     - Recurrence logic: marking a daily task complete creates a new task for the following day
     - Conflict dectection: Scheduler flags duplicate times
 
+Here is the output of a successful test run:
+
+```
+============================= test session starts ==============================
+platform darwin -- Python 3.13.5, pytest-9.0.3, pluggy-1.5.0 -- /opt/miniconda3/
+bin/python
+cachedir: .pytest_cache
+rootdir: /Users/chanelk/Documents/extracurriculars/CodePath/AI110/week5_pawpal_show
+plugins: anyio-4.13.0
+collected 19 items                                                             
+
+tests/test_pawpal.py::test_mark_completed_sets_task_completed PASSED     [  5%]
+tests/test_pawpal.py::test_add_task_to_pet_increases_task_count PASSED   [ 10%]
+tests/test_pawpal.py::test_sort_tasks_by_time_ascending_order PASSED     [ 15%]
+tests/test_pawpal.py::test_sort_tasks_empty_scheduler PASSED             [ 21%]
+tests/test_pawpal.py::test_sort_tasks_single_task PASSED                 [ 26%]
+tests/test_pawpal.py::test_sort_tasks_same_time_multiple_tasks PASSED    [ 31%]
+tests/test_pawpal.py::test_sort_tasks_reverse_order PASSED               [ 36%]
+tests/test_pawpal.py::test_sort_tasks_ignores_date_sorts_by_time_only PASSED [ 42%]
+tests/test_pawpal.py::test_complete_daily_task_creates_next_day_occurrence PASSED [ 47%]
+tests/test_pawpal.py::test_complete_weekly_task_creates_next_week_occurrence PASSED [ 52%]
+tests/test_pawpal.py::test_complete_non_recurring_task_no_next_task PASSED [ 57%]
+tests/test_pawpal.py::test_complete_task_with_invalid_frequency PASSED   [ 63%]
+tests/test_pawpal.py::test_complete_task_frequency_case_insensitive PASSED [ 68%]
+tests/test_pawpal.py::test_detect_time_conflicts_two_tasks_same_time PASSED [ 73%]
+tests/test_pawpal.py::test_detect_time_conflicts_no_conflicts PASSED     [ 78%]
+tests/test_pawpal.py::test_detect_time_conflicts_three_tasks_same_time PASSED [ 84%]
+tests/test_pawpal.py::test_detect_time_conflicts_empty_scheduler PASSED  [ 89%]
+tests/test_pawpal.py::test_detect_time_conflicts_single_task PASSED      [ 94%]
+tests/test_pawpal.py::test_detect_time_conflicts_multiple_time_slots_some_conflicts PASSED [100%]
+
+============================== 19 passed in 0.02s ==============================
+```
+
 Confidence Level in system reliability based on test results: 5/5
 
 ## Sample Output
