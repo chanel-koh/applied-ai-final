@@ -9,34 +9,18 @@ st.title("🐾 PawPal+")
 st.markdown(
     """
 Welcome to the PawPal+ starter app.
-
-This file is intentionally thin. It gives you a working Streamlit app so you can start quickly,
-but **it does not implement the project logic**. Your job is to design the system and build it.
-
-Use this app as your interactive demo once your backend classes/functions exist.
 """
 )
 
-with st.expander("Scenario", expanded=True):
+with st.expander("About PawPal+", expanded=True):
     st.markdown(
         """
 **PawPal+** is a pet care planning assistant. It helps a pet owner plan care tasks
 for their pet(s) based on constraints like time, priority, and preferences.
 
-You will design and implement the scheduling logic and connect it to this Streamlit UI.
 """
     )
 
-with st.expander("What you need to build", expanded=True):
-    st.markdown(
-        """
-At minimum, your system should:
-- Represent pet care tasks (what needs to happen, how long it takes, priority)
-- Represent the pet and the owner (basic info and preferences)
-- Build a plan/schedule for a day that chooses and orders tasks based on constraints
-- Explain the plan (why each task was chosen and when it happens)
-"""
-    )
 
 st.divider()
 
@@ -73,13 +57,13 @@ if "owner" in st.session_state:
     else:
         st.info("No pets added yet.")
 
-st.markdown("### Doctor Notes")
+st.markdown("### Vet Notes")
 if "owner" in st.session_state and st.session_state.owner.pets:
     note_pet_name = st.selectbox("Select pet for notes", [p.name for p in st.session_state.owner.pets], key="note_pet_selector")
-    note_text = st.text_area("Enter doctor or vet note", height=120)
+    note_text = st.text_area("Enter vet note", height=120)
     note_source = st.text_input("Note source", value="vet note")
 
-    if st.button("Save doctor note"):
+    if st.button("Save vet note"):
         selected_note_pet = next(p for p in st.session_state.owner.pets if p.name == note_pet_name)
         selected_note_pet.add_doctor_note(content=note_text, source=note_source)
         st.success(f"Note saved for {selected_note_pet.name}.")
@@ -90,7 +74,7 @@ if "owner" in st.session_state and st.session_state.owner.pets:
         for note in selected_note_pet.doctor_notes:
             st.write(f"- {note.date}: {note.source} — {note.content}")
 else:
-    st.info("Add a pet first to start saving doctor notes.")
+    st.info("Add a pet first to start saving vet notes.")
 
 st.markdown("### Tasks")
 
