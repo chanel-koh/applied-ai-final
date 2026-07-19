@@ -73,11 +73,41 @@ if "owner" in st.session_state:
     else:
         st.info("No pets added yet.")
 
+st.markdown("### Doctor Notes")
+if "owner" in st.session_state and st.session_state.owner.pets:
+    note_pet_name = st.selectbox("Select pet for notes", [p.name for p in st.session_state.owner.pets], key="note_pet_selector")
+    note_text = st.text_area("Enter doctor or vet note", height=120)
+    note_source = st.text_input("Note source", value="vet note")
+
+    if st.button("Save doctor note"):
+        selected_note_pet = next(p for p in st.session_state.owner.pets if p.name == note_pet_name)
+        selected_note_pet.add_doctor_note(content=note_text, source=note_source)
+        st.success(f"Note saved for {selected_note_pet.name}.")
+
+    selected_note_pet = next((p for p in st.session_state.owner.pets if p.name == note_pet_name), None)
+    if selected_note_pet and selected_note_pet.doctor_notes:
+        st.write(f"Saved notes for {selected_note_pet.name}:")
+        for note in selected_note_pet.doctor_notes:
+            st.write(f"- {note.date}: {note.source} — {note.content}")
+else:
+    st.info("Add a pet first to start saving doctor notes.")
+
 st.markdown("### Tasks")
 
 if "owner" in st.session_state and st.session_state.owner.pets:
     pet_names = [p.name for p in st.session_state.owner.pets]
     selected_pet_name = st.selectbox("Select pet for task", pet_names)
+
+    st.markdown("### Generate Recommendations")
+    recommendation_query = st.text_area("Recommendation prompt (optional)", height=100)
+    if st.button("Generate recommendations"):
+        recommendations = st.session_state.owner.recommend_tasks_for_pet(selected_pet_name, recommendation_query)
+        if recommendations:
+            st.success("Recommendations generated:")
+            for rec in recommendations:
+                st.write(f"- {rec}")
+        else:
+            st.info("No recommendations available for this pet yet.")
 
 col1, col2, col3 = st.columns(3)
 with col1:
