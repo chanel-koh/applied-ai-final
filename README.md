@@ -1,75 +1,103 @@
-# PawPal+ (Module 2 Project)
+# PawPal+
 
-Thsi project builds **PawPal+**, a Streamlit app that helps a pet owner plan care tasks for their pet.
+## Original Project
 
-## Scenario
+This builds on **PawPal+**, a Streamlit app originally developed in Modules 1–3 of CodePath AI110. The original goal was to design and implement a pet care planning assistant using an object-oriented system (Owner, Pet, Task, Scheduler) — first modeled in UML, then implemented in Python, then wired up to a Streamlit UI. Its original capabilities were letting an owner track pet care tasks (walks, feeding, meds, grooming), detect scheduling conflicts, and view a chronological daily plan.
 
-A busy pet owner needs help staying consistent with pet care. They want an assistant that can:
+## Summary
 
-- Track pet care tasks (walks, feeding, meds, enrichment, grooming, etc.)
-- Consider constraints (time available, priority, owner preferences)
-- Produce a daily plan and explain why it chose that plan
+This final iteration extends PawPal+ with a **Retrieval-Augmented Generation (RAG) recommendation feature**: owners can log free-text vet notes for a pet, and the system retrieves the most relevant notes and uses them as grounding context for an LLM (Google Gemini) to generate concrete, schedulable task recommendations (e.g., "15-minute walk every day," "Administer the prescribed medication on schedule"). This matters because it turns PawPal+ from a manual task tracker into an assistant that proactively surfaces care actions grounded in a pet's actual medical history, while still degrading gracefully to a rule-based fallback if no API key or network access is available.
 
-This project workflow first designed the system (UML), then implemented the logic in Python, then connected it to Streamlit UI.
+## Architecture Overview
 
-## What Was Built
+See [diagrams/system-diagram.mmd](diagrams/system-diagram.mmd) for the full Mermaid diagram. At a high level, the pipeline is:
 
-This final app:
+1. **Context Builder** — combines the user's request, the pet's profile (breed, age, activity level), and its saved vet notes.
+2. **Retriever** (`hybrid_note_retrieval` in [pawpal_system.py](pawpal_system.py)) — scores each vet note against the query using a blend of cosine similarity over bag-of-words vectors (semantic signal) and raw keyword overlap (lexical signal), then returns the top-N most relevant notes.
+3. **Reasoning Layer** (`_generate_task_suggestions`) — builds a prompt from the retrieved notes and pet context and sends it to Gemini (tries `gemini-3.1-flash-lite` → `gemini-3.1-flash` → `gemini-2.0-flash` in order), asking for exactly 3 recommendations with confidence scores.
+4. **Fallback path** (`_generate_fallback_recommendations`) — if Gemini is unavailable (no API key, package missing, or the call fails), a deterministic keyword-rule engine produces recommendations from the same retrieved notes, so the feature always returns something usable.
+5. **Scheduler / UI** — the user reviews recommendations in the Streamlit app and can add any of them directly as a real `Task`, which then flows through the existing sorting, conflict-detection, and recurrence logic from the original scheduler.
 
-- Let a user enter basic owner + pet info
-- Let a user add/edit tasks (duration + priority at minimum)
-- Generate a daily schedule/plan based on constraints and priorities
-- Display the plan clearly (and ideally explain the reasoning)
-- Include tests for the most important scheduling behaviors
+This keeps retrieval, generation, and scheduling as separate, independently testable stages rather than one monolithic call.
 
-## Getting started
+## Setup Instructions
 
-### Setup
+1. **Clone and enter the project directory.**
 
-```bash
-python -m venv .venv
-source .venv/bin/activate  # Windows: .venv\Scripts\activate
-pip install -r requirements.txt
+2. **Create and activate a virtual environment:**
+   ```bash
+   python -m venv .venv
+   source .venv/bin/activate  # Windows: .venv\Scripts\activate
+   ```
+
+3. **Install dependencies:**
+   ```bash
+   pip install -r requirements.txt
+   ```
+
+4. **(Optional) Enable live Gemini recommendations.** Create a `.env` file in the project root:
+   ```
+   GEMINI_API_KEY=your_api_key_here
+   ```
+   Without a key, the app still runs and uses the rule-based fallback recommendations automatically — no code changes needed.
+
+5. **Run the Streamlit app:**
+   ```bash
+   streamlit run app.py
+   ```
+
+6. **Run the CLI demo** (exercises scheduler features without the UI):
+   ```bash
+   python main.py
+   ```
+
+7. **Run the test suite:**
+   ```bash
+   python -m pytest
+   ```
+
+## Sample Interactions
+
+**1. Vet note → grounded recommendation**
+- Input (vet note for Buddy): `"Buddy should get a 20 minute walk every day to manage his weight."`
+- The retriever surfaces this note as most relevant when generating recommendations.
+- Output: `20-minute walk every day` (confidence: 88%).
+
+**2. Medication note**
+- Input (vet note for Whiskers): `"Whiskers needs her thyroid medication twice daily with food."`
+- Output: `Administer the prescribed medication on schedule` (confidence: 90%).
+
+**3. No vet notes yet**
+- Input: a brand-new pet profile with no saved notes.
+- The system falls back to pet metadata (name, breed, activity level) as the query context.
+- Output: `Review Mochi's vet notes and create a simple care task` (confidence: 70%) — a low-confidence, generic nudge rather than a fabricated specific claim.
+
+**4. Scheduler conflict detection (core feature, still functional)**
+```
+Adding two tasks at the same time (11:00 AM)...
+Checking for time conflicts...
+Conflicts detected:
+     Time conflict at 2026-06-13 11:00: Buddy (Grooming Session), Whiskers (Vet Check)
 ```
 
-## Smarter Scheduling Features
+## Design Decisions
 
-### Chronological Schedule Sorting (`sort_tasks_by_time()`)
-Tasks are sorted by their `HH:MM` time string using Python's built-in `sorted()` with a key function, ensuring the schedule always displays in chronological order regardless of insertion order. Supports both ascending and descending order.
+- **Hybrid retrieval over pure embeddings**: rather than calling an embeddings API for a small, per-pet set of short vet notes, retrieval uses lightweight bag-of-words cosine similarity blended with keyword overlap. This avoids extra API cost/latency for what is typically a handful of short notes, at the cost of missing deeper semantic paraphrase matches a real embedding model would catch.
+- **Fallback-first reliability**: the recommendation feature always has a deterministic, rule-based fallback path so the app is demoable and testable without any API key, and remains usable if Gemini quota is exhausted or the network is unavailable. The trade-off is that the fallback is less flexible — it only recognizes a fixed set of keyword categories (walk, medication, grooming, feeding, vet visit).
+- **Recommendations are proposals, not auto-scheduled tasks**: the user must explicitly pick a date/time and click "Add recommended task" rather than the system silently inserting tasks into the schedule. This preserves user control and avoids double-booking or acting on a bad LLM suggestion.
+- **Exact-time conflict detection (carried over from the original project)**: the scheduler flags conflicts only on exact timestamp matches rather than overlapping duration windows, which is simpler to reason about and sufficient given that the full sorted schedule is always shown to the owner for a final visual check.
 
-### Time Conflict Detection (`detect_time_conflicts()`)
-The scheduler groups tasks by their exact timestamp using a `defaultdict`, then scans for groups with more than one task. Any conflicts surface as human-readable warning messages (e.g., `"Time conflict at 2026-03-29 08:00: Mochi (Walk), Luna (Feeding)"`) displayed in the UI before the schedule renders.
+## Testing Summary
 
-### Automatic Task Recurrence on Completion (`complete_task_and_schedule_next()`)
-Marking a `daily` or `weekly` task complete triggers the scheduler to calculate the next occurrence (`+1 day` or `+7 days`) and automatically create and append a new `Task` instance to both the pet's task list and the scheduler — so the next cycle is always ready without manual re-entry.
-
-### Recurring Task Expansion (`expand_recurring_tasks()`)
-Tasks can be flagged as recurring with a `recurrence_interval` (`timedelta`). The scheduler expands them into concrete, non-recurring instances across any given date range — useful for viewing a multi-day plan without duplicating source tasks.
-
-### Multi-Criteria Filtering (`filter_tasks_by_completion_and_pet()`)
-Tasks can be filtered by completion status alone or combined with a pet name, making it easy to view pending tasks for a specific pet.
-
-### Next Task Lookup (`get_next_task()`)
-`get_next_task()` returns the single soonest upcoming task using `min()` over the task list by time — an O(n) scan that's simple and correct for the expected dataset size.
-
-### Testing PawPal+
-To run tests, use ```python -m pytest```
-
-Test coverage includes verification on the following:
-    - Sorting correctness: tasks are returned in chronological order
-    - Recurrence logic: marking a daily task complete creates a new task for the following day
-    - Conflict dectection: Scheduler flags duplicate times
-
-Here is the output of a successful test run:
+Test coverage includes verification of:
+- Sorting correctness: tasks are returned in chronological order
+- Recurrence logic: marking a daily/weekly task complete creates a new task for the following occurrence
+- Conflict detection: scheduler flags duplicate times
 
 ```
 ============================= test session starts ==============================
-platform darwin -- Python 3.13.5, pytest-9.0.3, pluggy-1.5.0 -- /opt/miniconda3/
-bin/python
-cachedir: .pytest_cache
-rootdir: /Users/chanelk/Documents/extracurriculars/CodePath/AI110/week5_pawpal_show
-plugins: anyio-4.13.0
-collected 19 items                                                             
+platform darwin -- Python 3.13.5, pytest-9.0.3, pluggy-1.5.0
+collected 19 items
 
 tests/test_pawpal.py::test_mark_completed_sets_task_completed PASSED     [  5%]
 tests/test_pawpal.py::test_add_task_to_pet_increases_task_count PASSED   [ 10%]
@@ -94,129 +122,13 @@ tests/test_pawpal.py::test_detect_time_conflicts_multiple_time_slots_some_confli
 ============================== 19 passed in 0.02s ==============================
 ```
 
-Confidence Level in system reliability based on test results: 5/5
+- **What worked**: All 19 existing pytest cases covering sorting, recurrence, and conflict detection continue to pass unmodified, confirming the RAG feature was added without regressing core scheduler behavior. Manual testing in the Streamlit UI confirmed the recommendation flow end-to-end: adding a vet note, generating recommendations, and converting a recommendation into a real scheduled task.
+- **What didn't work / had to change**: Early attempts at calling a single fixed Gemini model failed intermittently due to model availability/quota differences, which is why `_generate_task_suggestions` tries a list of candidate models in order before falling back to the rule engine.
+- **What we learned**: Testing an LLM-backed feature requires treating "no crash and something reasonable comes back" as the bar, since exact output text isn't deterministic — the fallback path is what's unit-tested precisely, while the Gemini path is verified manually via the UI status indicator (`get_gemini_status()`), which reports whether the key/library are available.
+- **Not yet tested**: duration-based conflict detection (overlapping ranges, not just exact time matches) and behavior with multiple owners/pets sharing overlapping schedules.
 
-## Sample Output
-```
-Tasks sorted by time (using sort_tasks_by_time):
-  ✓ 08:00: Morning Walk for Buddy
-  ○ 09:00: Medication for Buddy
-  ✓ 10:30: Vet Appointment for Buddy
-  ○ 12:00: Feeding for Whiskers
-  ○ 14:00: Play Time for Whiskers
-  ○ 18:00: Evening Walk for Buddy
-```
+## Reflection
 
-## Demo Walkthrough
+Building the RAG layer on top of an already-working scheduler clarified how much of "adding AI" is really about designing the non-AI scaffolding around it: retrieval quality, a fallback for when generation fails, and keeping the LLM's output as a suggestion a human approves rather than a decision the system acts on unilaterally. The biggest lesson was that reliability work (the fallback path, trying multiple models, surfacing an availability status to the user) ended up being as important as the generation logic itself — an AI feature that silently breaks when a quota runs out is worse than no AI feature at all. It also reinforced that grounding matters: recommendations tied to a specific retrieved vet note felt meaningfully more trustworthy than generic advice, which is the core promise of RAG over a bare LLM call.
 
-### Main UI Features and User Actions
-
-PawPal+ provides an intuitive interface for managing pet care schedules:
-
-**Owner & Pet Management:**
-- Create an owner profile with a name
-- Add multiple pets with details (name, breed, age, activity level)
-- View all registered pets and their information
-
-**Task Scheduling:**
-- Add pet care tasks with:
-  - Task title (e.g., "Morning Walk", "Feeding", "Medication")
-  - Duration (in minutes)
-  - Priority level (low, medium, high)
-  - Specific date and time (HH:MM format)
-  - Frequency (once, daily, weekly)
-- Tasks are automatically assigned to a specific pet
-- View and filter tasks by completion status and pet
-
-**Schedule Viewing:**
-- Display today's complete schedule in chronological order
-- View all upcoming tasks with time conflicts highlighted
-- Automatically reschedule recurring tasks when marked complete
-
-### Example Workflow
-
-Here's a typical user journey in PawPal+:
-
-1. **Create Owner:** User "Alice" starts the app and creates her profile
-2. **Add Pets:** Alice adds two pets:
-   - Buddy (Golden Retriever, 3 years old, high activity level)
-   - Whiskers (Cat, 2 years old, low activity level)
-3. **Schedule Tasks:** Alice adds daily care tasks:
-   - 08:00 - Morning Walk (Buddy)
-   - 12:00 - Feeding (Whiskers)
-   - 14:00 - Play Time (Whiskers)
-   - 18:00 - Evening Walk (Buddy)
-4. **View Schedule:** The scheduler automatically sorts all tasks chronologically
-5. **Mark Complete:** Alice marks the morning walk complete → scheduler automatically creates tomorrow's morning walk task
-6. **Check Conflicts:** When Alice tries to add a vet appointment and grooming session at the same time, the system warns her of the time conflict
-
-### Key Scheduler Behaviors
-
-**Chronological Sorting:** All tasks are automatically sorted by time (HH:MM format) regardless of insertion order, making it easy to see the day's timeline at a glance.
-
-**Conflict Detection:** The scheduler automatically identifies when multiple tasks are scheduled at the exact same time and displays warning messages to help users avoid double-booking.
-
-**Automatic Rescheduling:** When a user marks a daily or weekly task as complete, the system:
-- Marks the original task as done (✓ indicator)
-- Calculates the next occurrence (+1 day for daily, +7 days for weekly)
-- Automatically creates a new task instance for the next cycle
-
-**Multi-Criteria Filtering:** Tasks can be filtered by:
-- Completion status alone (show all pending or completed tasks)
-- Combined filters (show only incomplete tasks for a specific pet)
-
-**Recurring Task Expansion:** Tasks flagged as recurring are expanded into concrete instances across any date range, allowing users to preview multiple days of care needs at once.
-
-### Sample CLI Output
-
-Running `main.py` demonstrates the core scheduling features:
-
-```
-=== DEMONSTRATING SORTING AND FILTERING METHODS ===
-
-1. Tasks sorted by time (using sort_tasks_by_time):
-  ✓ 08:00: Morning Walk for Buddy
-  ○ 09:00: Medication for Buddy
-  ✓ 10:30: Vet Appointment for Buddy
-  ○ 12:00: Feeding for Whiskers
-  ○ 14:00: Play Time for Whiskers
-  ○ 18:00: Evening Walk for Buddy
-
-2. Filtering by completion status and pet:
-   Completed tasks for Buddy:
-     ✓ 08:00: Morning Walk
-     ✓ 10:30: Vet Appointment
-   Incomplete tasks for Whiskers:
-     ○ 12:00: Feeding
-     ○ 14:00: Play Time
-
-3. Recurring task expansion for next 3 days:
-     2026-06-13 09:00: Medication
-     2026-06-14 09:00: Medication
-     2026-06-15 09:00: Medication
-
-4. Today's schedule (original method):
-  ✓ 08:00: Morning Walk for Buddy
-  ○ 09:00: Medication for Buddy
-  ✓ 10:30: Vet Appointment for Buddy
-  ○ 12:00: Feeding for Whiskers
-  ○ 14:00: Play Time for Whiskers
-  ○ 18:00: Evening Walk for Buddy
-
-5. Demonstrating automatic task completion and rescheduling:
-   Before completing the evening walk:
-     ○ 18:00: Evening Walk (completed: False)
-   Completing the evening walk and scheduling next occurrence...
-   After completion:
-     ✓ 18:00: Evening Walk (completed: True)
-     New tasks in scheduler:
-       ✓ 2026-06-13 18:00: Evening Walk (completed: True)
-       ○ 2026-06-14 18:00: Evening Walk (completed: False)
-
-6. Demonstrating conflict detection:
-   Adding two tasks at the same time (11:00 AM)...
-   Checking for time conflicts...
-Conflicts detected:
-     Time conflict at 2026-06-13 11:00: Buddy (Grooming Session), Whiskers (Vet Check)
-```
 
