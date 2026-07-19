@@ -82,16 +82,37 @@ if "owner" in st.session_state and st.session_state.owner.pets:
     pet_names = [p.name for p in st.session_state.owner.pets]
     selected_pet_name = st.selectbox("Select pet for task", pet_names)
 
-    st.markdown("### Generate Recommendations")
-    recommendation_query = st.text_area("Recommendation prompt (optional)", height=100)
+    if "recommendations" not in st.session_state or st.session_state.get("recommendation_pet_name") != selected_pet_name:
+        st.session_state.recommendations = []
+        st.session_state.recommendation_pet_name = selected_pet_name
+
     if st.button("Generate recommendations"):
-        recommendations = st.session_state.owner.recommend_tasks_for_pet(selected_pet_name, recommendation_query)
-        if recommendations:
-            st.success("Recommendations generated:")
-            for rec in recommendations:
-                st.write(f"- {rec}")
-        else:
-            st.info("No recommendations available for this pet yet.")
+        st.session_state.recommendations = st.session_state.owner.recommend_tasks_for_pet(selected_pet_name)
+        st.success("Recommendations generated.")
+
+    if st.session_state.recommendations:
+        st.write("Recommended tasks:")
+        for rec in st.session_state.recommendations:
+            st.write(f"- {rec}")
+
+        selected_recommendation = st.selectbox(
+            "Choose a recommended task to add",
+            st.session_state.recommendations,
+            key="recommended_task_select"
+        )
+        if st.button("Add recommended task"):
+            selected_pet = next(p for p in st.session_state.owner.pets if p.name == selected_pet_name)
+            task_datetime = datetime.combine(date.today(), time(9, 0))
+            task = Task(
+                pet=selected_pet,
+                description=selected_recommendation,
+                time=task_datetime,
+                frequency="once",
+                duration=15,
+                priority="medium"
+            )
+            st.session_state.owner.scheduler.add_task(task)
+            st.success(f"Added recommended task for {selected_pet_name}: {selected_recommendation}")
 
 col1, col2, col3 = st.columns(3)
 with col1:
@@ -130,8 +151,18 @@ if "owner" in st.session_state and st.session_state.owner.pets:
     for pet in st.session_state.owner.pets:
         if pet.tasks:
             st.write(f"Tasks for {pet.name}:")
-            task_data = [{"description": t.description, "time": t.time.strftime("%Y-%m-%d %H:%M"), "frequency": t.frequency, "completed": t.completed} for t in pet.tasks]
-            st.table(task_data)
+            for task in pet.tasks:
+                completed = st.checkbox(
+                    f"{task.time.strftime('%Y-%m-%d %H:%M')} - {task.description} ({task.frequency})",
+                    value=task.completed,
+                    key=f"task_complete_{pet.name}_{task.description}_{task.time.isoformat()}"
+                )
+                if completed and not task.completed:
+                    task.mark_completed()
+                    st.success(f"Marked '{task.description}' complete for {pet.name}.")
+                elif not completed and task.completed:
+                    task.completed = False
+                    st.info(f"Marked '{task.description}' incomplete for {pet.name}.")
         else:
             st.info(f"No tasks for {pet.name} yet.")
 else:
