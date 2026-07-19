@@ -4,12 +4,33 @@ from datetime import datetime, date, timedelta
 from typing import List, Optional
 from collections import defaultdict
 import math
+import os
 import re
+from dotenv import load_dotenv, dotenv_values
+
+ENV_PATH = os.path.join(os.path.dirname(__file__), ".env")
+load_dotenv(dotenv_path=ENV_PATH)
+
+env_values = dotenv_values(ENV_PATH) or {}
+for key in ["GEMINI_API_KEY", "GOOGLE_API_KEY"]:
+    if not os.getenv(key) and env_values.get(key):
+        os.environ[key] = env_values[key]
+
+try:
+    from google import genai as google_genai
+except ImportError:  # pragma: no cover
+    google_genai = None
 
 @dataclass
 class Note:
     content: str
     date: date = field(default_factory=date.today)
+    source: str = "vet note"
+
+@dataclass
+class Recommendation:
+    description: str
+    confidence: float
     source: str = "vet note"
 
 @dataclass
@@ -156,38 +177,159 @@ def hybrid_note_retrieval(pet: Pet, query: str, top_n: int = 3) -> List[Note]:
     return [note for score, note in scored_notes[:top_n] if score > 0] or [note for _, note in scored_notes[:top_n]]
 
 
-def _generate_task_suggestions(pet: Pet, notes: List[Note]) -> List[str]:
-    note_text = " ".join(note.content.lower() for note in notes)
-    recommendations: List[str] = []
+def _get_gemini_api_key() -> Optional[str]:
+    return os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
 
-    if "arthritis" in note_text or "joint" in note_text:
-        recommendations.append("Gentle short walking session")
-        recommendations.append("Joint support reminder")
 
-    if "allergy" in note_text or "itch" in note_text or "skin" in note_text:
-        recommendations.append("Skin and grooming check")
-        recommendations.append("Allergy-safe feeding reminder")
+def _build_gemini_prompt(pet: Pet, notes: List[Note]) -> str:
+    note_context = "\n".join(f"- {note.content}" for note in notes) if notes else "No vet notes available."
+    existing_tasks = ", ".join(f"{task.description}" for task in pet.tasks) if pet.tasks else "No existing tasks."
+    return (
+        "You are helping generate a pet care recommendation from vet notes. "
+        f"Pet name: {pet.name}. Breed: {pet.breed}. Age: {pet.age}. Activity level: {pet.activity_level}.\n"
+        f"Existing tasks: {existing_tasks}\n"
+        f"Relevant vet notes:\n{note_context}\n"
+        "Return exactly 3 concise recommendations, each on a new line, in the format: "
+        "- <specific task recommendation> | confidence:<0-100>"
+    )
 
-    if "medication" in note_text or "pill" in note_text or "dose" in note_text:
-        recommendations.append("Medication reminder task")
 
-    if "diet" in note_text or "food" in note_text or "weight" in note_text:
-        recommendations.append("Diet review and feeding adjustment")
+def _extract_duration_minutes(text: str) -> Optional[int]:
+    matches = re.findall(r"(\d+)\s*(?:min|mins|minute|minutes)", text.lower())
+    if matches:
+        return int(matches[0])
+    return None
 
-    if not recommendations:
-        if pet.activity_level.lower() == "high":
-            recommendations.append("Extra playtime and enrichment activity")
-        elif pet.activity_level.lower() == "low":
-            recommendations.append("Short low-impact walk")
+
+def _extract_frequency(text: str) -> str:
+    lowered = text.lower()
+    if "every day" in lowered or "daily" in lowered or "once a day" in lowered:
+        return "daily"
+    if "every week" in lowered or "weekly" in lowered or "once a week" in lowered:
+        return "weekly"
+    return "once"
+
+
+def _generate_fallback_recommendations(pet: Pet, notes: List[Note]) -> List[Recommendation]:
+    recommendations: List[Recommendation] = []
+    seen_descriptions = set()
+
+    for note in notes or [Note(content=f"General care for {pet.name}", date=date.today())]:
+        lowered = note.content.lower()
+
+        if "walk" in lowered or "exercise" in lowered or "fresh air" in lowered:
+            duration = _extract_duration_minutes(note.content)
+            frequency = _extract_frequency(note.content)
+            if duration:
+                description = f"{duration}-minute walk"
+                if frequency == "daily":
+                    description += " every day"
+                elif frequency == "weekly":
+                    description += " every week"
+            else:
+                description = "Regular walk and outdoor time"
+            confidence = 0.88
+        elif "medication" in lowered or "medicine" in lowered or "pill" in lowered:
+            description = "Administer the prescribed medication on schedule"
+            confidence = 0.9
+        elif "bath" in lowered or "groom" in lowered or "brush" in lowered:
+            description = "Schedule a grooming or hygiene session"
+            confidence = 0.82
+        elif "feed" in lowered or "meal" in lowered or "food" in lowered:
+            description = "Keep the feeding routine consistent"
+            confidence = 0.8
+        elif "vet" in lowered or "checkup" in lowered or "appointment" in lowered:
+            description = "Book or prepare for the upcoming vet visit"
+            confidence = 0.78
         else:
-            recommendations.append("Balanced walk and feeding check")
+            description = f"Review {pet.name}'s care notes and monitor the condition closely"
+            confidence = 0.75
 
-    recommendations.append("Follow up with vet if the pet's condition changes")
-    deduped: List[str] = []
-    for rec in recommendations:
-        if rec not in deduped:
-            deduped.append(rec)
-    return deduped[:5]
+        normalized = description.lower()
+        if normalized not in seen_descriptions:
+            recommendations.append(Recommendation(description=description, confidence=confidence, source="fallback"))
+            seen_descriptions.add(normalized)
+
+        if len(recommendations) >= 3:
+            break
+
+    if recommendations:
+        return recommendations
+
+    return [
+        Recommendation(
+            description=f"Review {pet.name}'s vet notes and create a simple care task",
+            confidence=0.7,
+            source="fallback"
+        )
+    ]
+
+
+def _generate_task_suggestions(pet: Pet, notes: List[Note]) -> List[Recommendation]:
+    api_key = _get_gemini_api_key()
+    if api_key and google_genai is not None:
+        try:
+            client = google_genai.Client(api_key=api_key)
+            prompt = _build_gemini_prompt(pet, notes)
+            # Prefer a flash-lite model which often has free-tier quota available,
+            # fall back to other models if the preferred one fails for quota or availability.
+            candidate_models = ["gemini-3.1-flash-lite", "gemini-3.1-flash", "gemini-2.0-flash"]
+            response = None
+            for m in candidate_models:
+                try:
+                    response = client.models.generate_content(model=m, contents=prompt)
+                    # if no exception, break and use this response
+                    break
+                except Exception:
+                    response = None
+                    continue
+            text = getattr(response, "text", "") or ""
+            lines = [line.strip() for line in text.splitlines() if line.strip()]
+            parsed_recommendations = []
+            for line in lines[:3]:
+                if "| confidence:" in line:
+                    description, confidence_text = line.split("| confidence:", 1)
+                    description = description.replace("- ", "", 1).strip()
+                    try:
+                        confidence = max(0.0, min(1.0, int(confidence_text.strip()) / 100.0))
+                    except ValueError:
+                        confidence = 0.8
+                    parsed_recommendations.append(Recommendation(description=description, confidence=confidence, source="gemini"))
+            if parsed_recommendations:
+                return parsed_recommendations
+        except Exception:
+            pass
+
+    return _generate_fallback_recommendations(pet, notes)
+
+
+def get_gemini_status() -> tuple[bool, str]:
+    """Return (available, reason) for Gemini usage.
+
+    - available: True if the google-genai package is importable and an API key is present.
+    - reason: human-readable explanation for availability or why it's unavailable.
+    """
+    api_key = _get_gemini_api_key()
+    if google_genai is None:
+        return False, "google-genai library not installed"
+    if not api_key:
+        return False, "GEMINI_API_KEY or GOOGLE_API_KEY not set in environment"
+    return True, "Gemini appears available (library + API key present)"
+
+
+def generate_gemini_demo(pet: Pet, notes: List[Note]) -> List[Recommendation]:
+    """Return a small set of demo recommendations labelled as coming from Gemini.
+
+    This is used when the real Gemini client is unavailable but the user
+    still wants to see what AI-generated recommendations would look like.
+    """
+    base = _generate_fallback_recommendations(pet, notes)
+    demo_recs: List[Recommendation] = []
+    for rec in base:
+        demo_recs.append(Recommendation(description=f"{rec.description} (gemini demo)", confidence=min(1.0, rec.confidence + 0.05), source="gemini-demo"))
+        if len(demo_recs) >= 3:
+            break
+    return demo_recs
 
 
 class Owner:
@@ -223,8 +365,8 @@ class Owner:
                 return pet
         return None
 
-    def recommend_tasks_for_pet(self, pet_name: str, query: Optional[str] = None) -> List[str]:
-        """Generate pet care recommendations using doctor notes and pet context."""
+    def recommend_tasks_for_pet(self, pet_name: str, query: Optional[str] = None) -> List[Recommendation]:
+        """Generate pet care recommendations using vet notes and pet context."""
         pet = self.find_pet(pet_name)
         if pet is None:
             return []

@@ -1,5 +1,5 @@
 import streamlit as st
-from pawpal_system import Owner, Pet, Task, Scheduler
+from pawpal_system import Owner, Pet, Task, Scheduler, get_gemini_status
 from datetime import datetime, date, time
 
 st.set_page_config(page_title="PawPal+", page_icon="🐾", layout="centered")
@@ -61,11 +61,10 @@ st.markdown("### Vet Notes")
 if "owner" in st.session_state and st.session_state.owner.pets:
     note_pet_name = st.selectbox("Select pet for notes", [p.name for p in st.session_state.owner.pets], key="note_pet_selector")
     note_text = st.text_area("Enter vet note", height=120)
-    note_source = st.text_input("Note source", value="vet note")
 
     if st.button("Save vet note"):
         selected_note_pet = next(p for p in st.session_state.owner.pets if p.name == note_pet_name)
-        selected_note_pet.add_doctor_note(content=note_text, source=note_source)
+        selected_note_pet.add_doctor_note(content=note_text, source="vet note")
         st.success(f"Note saved for {selected_note_pet.name}.")
 
     selected_note_pet = next((p for p in st.session_state.owner.pets if p.name == note_pet_name), None)
@@ -90,29 +89,48 @@ if "owner" in st.session_state and st.session_state.owner.pets:
         st.session_state.recommendations = st.session_state.owner.recommend_tasks_for_pet(selected_pet_name)
         st.success("Recommendations generated.")
 
-    if st.session_state.recommendations:
-        st.write("Recommended tasks:")
-        for rec in st.session_state.recommendations:
-            st.write(f"- {rec}")
+    # Show Gemini availability and allow a demo run when real Gemini isn't used
+    gemini_available, gemini_reason = get_gemini_status()
+    st.caption(f"Gemini status: {'available' if gemini_available else 'unavailable'} — {gemini_reason}")
 
-        selected_recommendation = st.selectbox(
+
+    if st.session_state.recommendations:
+        # Check if using fallback recommendations
+        is_fallback = all(rec.source == "fallback" for rec in st.session_state.recommendations)
+        if is_fallback:
+            st.info("💡 Using local recommendations from vet notes (Gemini temporarily unavailable)")
+        elif any("gemini" in (rec.source or "").lower() for rec in st.session_state.recommendations):
+            st.success("✨ Using AI-generated recommendations from Gemini")
+        else:
+            st.success("✨ Using generated recommendations")
+        
+        st.write("Recommended tasks:")
+        recommendation_options = [f"{rec.description} (confidence: {rec.confidence:.0%})" for rec in st.session_state.recommendations]
+        selected_option = st.selectbox(
             "Choose a recommended task to add",
-            st.session_state.recommendations,
+            recommendation_options,
             key="recommended_task_select"
         )
+        selected_index = recommendation_options.index(selected_option)
+        selected_recommendation = st.session_state.recommendations[selected_index]
+
+        recommended_task_date = st.date_input("Recommended task date", value=date.today(), key="recommended_task_date")
+        recommended_task_time = st.time_input("Recommended task time", value=time(9, 0), key="recommended_task_time")
+        recommended_task_frequency = st.selectbox("Recommended task frequency", ["once", "daily", "weekly"], index=0, key="recommended_task_frequency")
+
         if st.button("Add recommended task"):
             selected_pet = next(p for p in st.session_state.owner.pets if p.name == selected_pet_name)
-            task_datetime = datetime.combine(date.today(), time(9, 0))
+            task_datetime = datetime.combine(recommended_task_date, recommended_task_time)
             task = Task(
                 pet=selected_pet,
-                description=selected_recommendation,
+                description=selected_recommendation.description,
                 time=task_datetime,
-                frequency="once",
+                frequency=recommended_task_frequency,
                 duration=15,
                 priority="medium"
             )
             st.session_state.owner.scheduler.add_task(task)
-            st.success(f"Added recommended task for {selected_pet_name}: {selected_recommendation}")
+            st.success(f"Added recommended task for {selected_pet_name}: {selected_recommendation.description}")
 
 col1, col2, col3 = st.columns(3)
 with col1:
@@ -206,10 +224,6 @@ if st.button("Generate schedule"):
             st.subheader("Sorted Schedule")
             st.table(task_rows)
 
-            next_task = scheduler.get_next_task()
-            if next_task:
-                st.success(f"Next task: {next_task.description} for {next_task.pet.name} at {next_task.time.strftime('%H:%M')}")
-            else:
-                st.info("No upcoming tasks available.")
+            
     else:
         st.error("Create owner and pet first.")

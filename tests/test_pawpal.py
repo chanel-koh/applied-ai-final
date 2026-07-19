@@ -356,3 +356,18 @@ def test_detect_time_conflicts_multiple_time_slots_some_conflicts():
     # Should have exactly 1 conflict (at 12:00)
     assert len(conflicts) == 1
     assert "12:00" in conflicts[0]
+
+
+def test_recommend_tasks_for_pet_creates_specific_walk_recommendation():
+    """Vet notes with a clear walk duration should produce a specific recommendation."""
+    pet = Pet(name="Mochi", breed="dog", age=3, activity_level="medium")
+    pet.add_doctor_note("The pet needs a 20 min walk every day and should get fresh air.")
+
+    owner = Owner("Jordan")
+    owner.add_pet(pet)
+
+    recommendations = owner.recommend_tasks_for_pet(pet.name)
+
+    assert len(recommendations) > 0
+    assert any("20-minute walk" in recommendation.description.lower() for recommendation in recommendations)
+    assert any(recommendation.confidence >= 0.8 for recommendation in recommendations)
