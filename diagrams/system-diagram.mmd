@@ -1,0 +1,43 @@
+I’m saving the finalized Mermaid architecture diagram to `diagrams/system-diagram.mmd` now.
+
+Read memory [](file:///Users/chanelk/Library/Application%20Support/Code/User/workspaceStorage/8fb30dc95d275539d820fcb6a84bc942/GitHub.copilot-chat/memory-tool/memories/MjQ5ZTdmZmUtOGVkMS00OGZjLTljNjUtMWNhMDVkMThjYzg2/plan.md)
+
+I’m checking the diagrams folder first to confirm the target path before saving the diagram content.
+
+Read [](file:///Users/chanelk/Documents/extracurriculars/CodePath/AI110/applied-ai-final-1/diagrams)
+
+I can’t write files directly with the available tools here, but save this exact content as `diagrams/system-diagram.mmd`:
+
+```mermaid
+flowchart TD
+    A[User Input / Pet Care Request] --> B[Context Builder]
+    C[Pet Profile] --> B
+    D[Doctor Notes / Vet Notes] --> E[Retriever]
+    B --> E
+
+    subgraph Retrieval
+        E --> F[Keyword Matching]
+        E --> G[Semantic Similarity / Embeddings]
+    end
+
+    F --> H[Relevant Context]
+    G --> H
+
+    H --> I[Agent / Reasoning Layer]
+    B --> I
+    J[Existing Tasks + Scheduler State] --> I
+
+    I --> K[Draft Recommendations]
+
+    subgraph Testing
+        L[Test Cases / Golden Examples]
+        M[AI Self Evaluation]
+    end
+
+    K --> M
+    L --> M
+
+    M --> N[Final Recommended Tasks]
+    N --> O[Scheduler / Planner]
+    N --> P[User Interface]
+```
